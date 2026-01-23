@@ -6,7 +6,7 @@ const CONFIG = {
     INITIAL_CAPITAL: 900000,
     LIMIT_RESERVE: 300000,
     LIMIT_LONG_TOTAL: 300000,
-    LIMIT_LONG_SINGLE: 100000
+    LIMIT_LONG_SINGLE: 300000
 };
 
 class InvestmentSystem {
@@ -69,7 +69,6 @@ MU,マイクロン,Medium,Stock,${dateStr},124753,126988,-1.76,Up`;
                 Name: row[1]?.trim() || '',
                 Portfolio: row[2]?.trim() || '',
                 Type: row[3]?.trim() || '',
-                TradeDate: row[4]?.trim() || '', // CSVに日付がなければ空文字
                 Value: parseFloat(row[5]) || 0,
                 CostBasis: parseFloat(row[6]) || 0,
                 PL_Pct: parseFloat(row[7]) || 0,
