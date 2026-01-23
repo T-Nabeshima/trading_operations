@@ -6,7 +6,7 @@ const CONFIG = {
     INITIAL_CAPITAL: 900000, // 基準元本
     LIMIT_RESERVE: 300000,   // 最低保証金
     LIMIT_LONG_TOTAL: 300000, // 長期枠上限
-    LIMIT_LONG_SINGLE: 100000 // 長期個別上限
+    LIMIT_LONG_SINGLE: 300000 // 長期個別上限
 };
 
 class InvestmentSystem {
