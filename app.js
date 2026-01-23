@@ -1,25 +1,24 @@
 /**
- * 投資運用支援システム Logic ver1.0
+ * 投資運用支援システム Logic v1.2
  */
 
 const CONFIG = {
-    INITIAL_CAPITAL: 900000, // 基準元本
-    LIMIT_RESERVE: 300000,   // 最低保証金
-    LIMIT_LONG_TOTAL: 300000, // 長期枠上限
-    LIMIT_LONG_SINGLE: 300000 // 長期個別上限
+    INITIAL_CAPITAL: 900000,
+    LIMIT_RESERVE: 300000,
+    LIMIT_LONG_TOTAL: 300000,
+    LIMIT_LONG_SINGLE: 300000
 };
 
 class InvestmentSystem {
     constructor() {
         this.assets = [];
         this.actionLogs = [];
+        this.ignoredSignals = []; 
         this.chartInstance = null;
         
-        // 初期化
         this.loadFromStorage();
         this.renderDate();
         
-        // 初回ロード時にデータがなければテストデータをセット
         if (this.assets.length === 0) {
             document.getElementById('csvInput').value = this.getTestData();
         } else {
@@ -27,16 +26,16 @@ class InvestmentSystem {
         }
     }
 
-    // --- 3. Data Model & Parsing ---
+    // --- Data Parsing ---
 
     getTestData() {
-        return `Ticker,Portfolio,Type,Value,CostBasis,PL_Pct,Trend_Day
-CASH_RESERVE,Reserve,Cash,300000,300000,0.0,Range
-CASH_LONG,Long,Cash,244207,244207,0.0,Range
-CASH_MED,Medium,Cash,45078,45078,0.0,Range
-ALAB,Long,Stock,55793,56368,-1.02,Range
-CRWD,Medium,Stock,188700,185115,1.93,Up
-XOM,Medium,Stock,42281,39410,7.28,Up`;
+        return `Ticker,Name,Portfolio,Type,Value,CostBasis,PL_Pct,Trend_Day
+CASH_RESERVE,予備費,Reserve,Cash,300000,300000,0.0,Range
+CASH_LONG,長期余力,Long,Cash,244207,244207,0.0,Range
+CASH_MED,中期余力,Medium,Cash,45078,45078,0.0,Range
+ALAB,Astera Labs,Long,Stock,55793,56368,-1.02,Range
+CRWD,CrowdStrike,Medium,Stock,188700,185115,1.93,Up
+XOM,Exxon Mobil,Medium,Stock,42281,39410,7.28,Up`;
     }
 
     processInput() {
@@ -44,21 +43,26 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
         if (!rawText) return;
 
         const lines = rawText.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
+        // ヘッダー想定: Ticker, Name, Portfolio, Type, Value, CostBasis, PL_Pct, Trend_Day
         
         const data = [];
         for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            const row = lines[i].split(',');
-            const obj = {};
-            headers.forEach((h, index) => {
-                let val = row[index] ? row[index].trim() : '';
-                // 数値変換
-                if (['Value', 'CostBasis', 'PL_Pct'].includes(h)) {
-                    val = parseFloat(val);
-                }
-                obj[h] = val;
-            });
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const row = line.split(',');
+            
+            // TradeDateを削除したためインデックス変更
+            const obj = {
+                Ticker: row[0].trim(),
+                Name: row[1].trim(),
+                Portfolio: row[2].trim(),
+                Type: row[3].trim(),
+                Value: parseFloat(row[4]),
+                CostBasis: parseFloat(row[5]),
+                PL_Pct: parseFloat(row[6]),
+                Trend_Day: row[7].trim()
+            };
             data.push(obj);
         }
 
@@ -68,22 +72,13 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
         alert('データを更新しました');
     }
 
-    // --- 4.1 Allocation Logic ---
+    // --- Logic ---
 
     calculateStats() {
         const totalValue = this.assets.reduce((sum, item) => sum + (item.Value || 0), 0);
-        
-        // ドローダウン計算
         const ddPct = ((totalValue - CONFIG.INITIAL_CAPITAL) / CONFIG.INITIAL_CAPITAL) * 100;
 
-        // ポートフォリオ別集計
-        const allocation = {
-            Reserve: 0,
-            Long: 0,
-            Medium: 0
-        };
-        
-        // 長期個別銘柄チェック用
+        const allocation = { Reserve: 0, Long: 0, Medium: 0 };
         const longStocks = [];
 
         this.assets.forEach(a => {
@@ -95,98 +90,87 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
             }
         });
 
-        // 資金配分アラート生成
         const alerts = [];
         if (ddPct <= -12) alerts.push({ level: 'FATAL', msg: '年次DD超過 (-12%): 直ちに運用を停止してください' });
         else if (ddPct <= -6) alerts.push({ level: 'CRITICAL', msg: '月次DD超過 (-6%): 新規建玉禁止' });
 
-        // 箱分けチェック
         const cashReserve = this.assets.find(a => a.Ticker === 'CASH_RESERVE');
         const reserveValue = cashReserve ? cashReserve.Value : 0;
 
         if (reserveValue < CONFIG.LIMIT_RESERVE) {
-            alerts.push({ level: 'WARN', msg: `保証金不足: 30万円を下回っています (現在: ${reserveValue.toLocaleString()})` });
+            alerts.push({ level: 'WARN', msg: `保証金不足: 30万円を下回っています` });
         }
         if (allocation.Long > CONFIG.LIMIT_LONG_TOTAL) {
-            alerts.push({ level: 'WARN', msg: `長期枠超過: 30万円を超えています (現在: ${allocation.Long.toLocaleString()})` });
+            alerts.push({ level: 'WARN', msg: `長期枠超過: 30万円を超えています` });
         }
         longStocks.forEach(s => {
             if (s.Value > CONFIG.LIMIT_LONG_SINGLE) {
-                alerts.push({ level: 'WARN', msg: `銘柄上限超過(${s.Ticker}): 10万円を超えています` });
+                alerts.push({ level: 'WARN', msg: `銘柄上限超過(${s.Ticker}): 30万円を超えています` });
             }
         });
 
         return { totalValue, ddPct, allocation, alerts };
     }
 
-    // --- 4.2 Signal Generation Logic ---
-
     generateSignal(asset) {
-        if (asset.Type === 'Cash') return null; // 現金はシグナルなし
+        if (asset.Type === 'Cash') return null;
 
         const pl = asset.PL_Pct;
-        const trend = asset.Trend_Day; // 設計書ではLongはMonthだが、CSVにないのでDayで代用またはUI変更とする
+        const trend = asset.Trend_Day;
+        let result = null;
 
         // A. 長期ポートフォリオ
         if (asset.Portfolio === 'Long') {
-            if (pl <= -12) return { type: 'SELL', label: 'STOP LOSS', reason: '損切りライン(-12%)到達' };
-            if (pl >= 50) return { type: 'SELL', label: 'TAKE PROFIT (Target 2)', reason: '第2利確(+50%)到達' };
-            if (pl >= 30) return { type: 'SELL', label: 'TAKE PROFIT (Target 1)', reason: '第1利確(+30%)到達' };
-            if (trend === 'Down') return { type: 'SELL', label: 'SELL ALL', reason: 'トレンド転換(Down)' };
+            if (pl <= -12) result = { type: 'SELL', label: 'STOP LOSS', reason: '損切りライン(-12%)到達' };
+            else if (pl >= 50) result = { type: 'SELL', label: 'TAKE PROFIT (Target 2)', reason: '第2利確(+50%)到達' };
+            else if (pl >= 30) result = { type: 'SELL', label: 'TAKE PROFIT (Target 1)', reason: '第1利確(+30%)到達' };
+            else if (trend === 'Down') result = { type: 'SELL', label: 'SELL ALL', reason: 'トレンド転換(Down)' };
         }
-
         // B. 中期ポートフォリオ
-        if (asset.Portfolio === 'Medium') {
-            // 信用売り
+        else if (asset.Portfolio === 'Medium') {
             if (asset.Type === 'MarginShort') {
-                if (pl <= -5) return { type: 'BUY_BACK', label: 'STOP LOSS', reason: '損切りライン(-5%)到達' }; // 損失方向
-                if (pl >= 6) return { type: 'BUY_BACK', label: 'TAKE PROFIT', reason: '利確ライン(+6%)到達' };
-            } 
-            // 現物・信用買い
-            else {
-                if (asset.Type === 'MarginLong' && pl <= -6) return { type: 'SELL', label: 'STOP LOSS', reason: '信用損切り(-6%)到達' };
-                if (asset.Type === 'Stock' && pl <= -10) return { type: 'SELL', label: 'STOP LOSS', reason: '現物損切り(-10%)到達' };
+                if (pl <= -5) result = { type: 'BUY_BACK', label: 'STOP LOSS', reason: '損切りライン(-5%)到達' };
+                else if (pl >= 6) result = { type: 'BUY_BACK', label: 'TAKE PROFIT', reason: '利確ライン(+6%)到達' };
+            } else {
+                if (asset.Type === 'MarginLong' && pl <= -6) result = { type: 'SELL', label: 'STOP LOSS', reason: '信用損切り(-6%)到達' };
+                else if (asset.Type === 'Stock' && pl <= -10) result = { type: 'SELL', label: 'STOP LOSS', reason: '現物損切り(-10%)到達' };
+                else if (pl >= 12) result = { type: 'SELL', label: 'TAKE PROFIT (Target 2)', reason: '第2利確(+12%)到達' };
+                else if (pl >= 8) result = { type: 'SELL', label: 'TAKE PROFIT (Target 1)', reason: '第1利確(+8%)到達' };
                 
-                if (pl >= 12) return { type: 'SELL', label: 'TAKE PROFIT (Target 2)', reason: '第2利確(+12%)到達' };
-                if (pl >= 8) return { type: 'SELL', label: 'TAKE PROFIT (Target 1)', reason: '第1利確(+8%)到達' };
-                
-                // ※期間期限ロジックはCSVに保有日数がないため、今回は実装スキップ(要件メモ)
+                // ※期間期限ロジックはTradeDate削除に伴い自動計算不能のため除外
             }
         }
 
-        return null; // 正常
+        // 無視リストチェック
+        if (result) {
+            const isIgnored = this.ignoredSignals.some(s => s.ticker === asset.Ticker && s.signalType === result.label);
+            if (isIgnored) return null;
+        }
+
+        return result;
     }
 
-    // --- View & Interaction ---
+    // --- View ---
 
     updateDashboard() {
         const stats = this.calculateStats();
         
-        // Header Stats
         document.getElementById('totalValue').innerText = `¥${stats.totalValue.toLocaleString()}`;
-        
         const ddElem = document.getElementById('drawdown');
         ddElem.innerText = `${stats.ddPct.toFixed(2)}%`;
         ddElem.className = `text-xl font-bold ${stats.ddPct < 0 ? 'text-red-600' : 'text-green-600'}`;
-
-        // Compliance Rate (簡易計算: ログの数 / (ログ数 + 未処理シグナル数))
-        // ※本来は履歴全体を持つべきだが、今回は簡易的に表示
         document.getElementById('complianceRate').innerText = `${this.calculateCompliance()}%`;
-
-        // Allocation Chart
         this.renderChart(stats.allocation);
 
-        // Alerts (Allocation)
         const alertContainer = document.getElementById('allocationAlerts');
         alertContainer.innerHTML = '';
         stats.alerts.forEach(alert => {
             const div = document.createElement('div');
-            div.className = `p-2 text-xs rounded ${alert.level === 'FATAL' || alert.level === 'CRITICAL' ? 'bg-red-200 text-red-800' : 'bg-yellow-100 text-yellow-800'}`;
+            div.className = `p-2 text-xs rounded ${alert.level.includes('FATAL') ? 'bg-red-200 text-red-800' : 'bg-yellow-100 text-yellow-800'}`;
             div.innerText = `[${alert.level}] ${alert.msg}`;
             alertContainer.appendChild(div);
         });
 
-        // Asset List & Signals
         const tbody = document.getElementById('assetTableBody');
         const actionList = document.getElementById('actionList');
         const actionSection = document.getElementById('actionRequiredSection');
@@ -195,38 +179,41 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
         actionList.innerHTML = '';
         let signalCount = 0;
 
-        this.assets.forEach((asset, index) => {
+        this.assets.forEach(asset => {
             const signal = this.generateSignal(asset);
             
-            // Table Row
+            // テーブル表示
             const tr = document.createElement('tr');
             tr.className = "border-b hover:bg-gray-50";
             tr.innerHTML = `
-                <td class="p-2 font-bold">${asset.Ticker}</td>
+                <td class="p-2">
+                    <div class="font-bold">${asset.Ticker}</div>
+                    <div class="text-xs text-gray-500">${asset.Name}</div>
+                </td>
                 <td class="p-2 text-xs text-gray-500">${asset.Portfolio}<br>${asset.Type}</td>
                 <td class="p-2 text-right">¥${asset.Value.toLocaleString()}</td>
                 <td class="p-2 text-right ${asset.PL_Pct > 0 ? 'text-green-600' : (asset.PL_Pct < 0 ? 'text-red-600' : '')}">${asset.PL_Pct}%</td>
                 <td class="p-2 text-xs">${asset.Trend_Day}</td>
                 <td class="p-2">
-                    ${signal ? `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold">${signal.label}</span>` : '<span class="text-green-500 text-xs">OK</span>'}
+                    ${signal ? `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold whitespace-nowrap">${signal.label}</span>` : '<span class="text-green-500 text-xs">OK</span>'}
                 </td>
             `;
             tbody.appendChild(tr);
 
-            // Action Card if signal exists
+            // アラートカード表示
             if (signal) {
                 signalCount++;
                 const card = document.createElement('div');
                 card.className = "bg-white p-3 border rounded shadow-sm flex justify-between items-center";
                 card.innerHTML = `
                     <div>
-                        <div class="font-bold text-lg">${asset.Ticker} <span class="text-sm font-normal text-gray-500">(${asset.Portfolio})</span></div>
-                        <div class="text-red-600 font-bold">${signal.label}</div>
+                        <div class="font-bold">${asset.Ticker} <span class="text-xs font-normal text-gray-500">(${asset.Name})</span></div>
+                        <div class="text-red-600 font-bold text-sm">${signal.label}</div>
                         <div class="text-xs text-gray-500">理由: ${signal.reason}</div>
                     </div>
                     <div class="flex flex-col gap-2">
                         <button onclick="app.executeAction('${asset.Ticker}', '${signal.label}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700">実行記録</button>
-                        <button onclick="app.ignoreAction('${asset.Ticker}')" class="bg-gray-300 text-gray-700 text-xs px-3 py-1 rounded hover:bg-gray-400">無視</button>
+                        <button onclick="app.ignoreAction('${asset.Ticker}', '${signal.label}')" class="bg-gray-300 text-gray-700 text-xs px-3 py-1 rounded hover:bg-gray-400">無視</button>
                     </div>
                 `;
                 actionList.appendChild(card);
@@ -234,42 +221,41 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
         });
 
         document.getElementById('actionCount').innerText = signalCount;
-        if (signalCount > 0) {
-            actionSection.classList.remove('hidden');
-        } else {
-            actionSection.classList.add('hidden');
-        }
+        if (signalCount > 0) actionSection.classList.remove('hidden');
+        else actionSection.classList.add('hidden');
 
         this.renderLogs();
     }
 
-    // --- Actions & Logs ---
+    // --- Actions ---
 
     executeAction(ticker, action) {
         if(!confirm(`${ticker} のアクション「${action}」を実行済として記録しますか？`)) return;
-        
-        const log = {
-            date: new Date().toLocaleString(),
-            ticker: ticker,
-            action: action,
-            type: 'EXECUTE'
-        };
-        this.actionLogs.unshift(log);
-        this.saveToStorage();
-        this.renderLogs();
-        // コンプライアンス率計算のためにリロード推奨だが、今回はアラートのみ消す処理などは省略（再インポート前提の設計のため）
+        this.addLog(ticker, action, 'EXECUTE');
     }
 
-    ignoreAction(ticker) {
+    ignoreAction(ticker, actionLabel) {
         const reason = prompt("無視する理由を入力してください:");
-        if (!reason) return;
+        if (reason === null) return; 
 
+        this.ignoredSignals.push({ ticker: ticker, signalType: actionLabel });
+        this.addLog(ticker, 'IGNORE', 'IGNORE', reason);
+        
+        this.saveToStorage();
+        this.updateDashboard(); 
+    }
+    
+    clearIgnoredSignals() {
+        if(!confirm("無視リストをリセットし、全てのアラートを再表示しますか？")) return;
+        this.ignoredSignals = [];
+        this.saveToStorage();
+        this.updateDashboard();
+    }
+
+    addLog(ticker, action, type, reason = '') {
         const log = {
             date: new Date().toLocaleString(),
-            ticker: ticker,
-            action: 'IGNORE',
-            reason: reason,
-            type: 'IGNORE'
+            ticker, action, type, reason
         };
         this.actionLogs.unshift(log);
         this.saveToStorage();
@@ -297,28 +283,21 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
 
     renderChart(allocation) {
         const ctx = document.getElementById('allocationChart').getContext('2d');
-        const dataValues = [allocation.Reserve, allocation.Long, allocation.Medium];
-        
-        if (this.chartInstance) {
-            this.chartInstance.destroy();
-        }
-
+        if (this.chartInstance) this.chartInstance.destroy();
         this.chartInstance = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Reserve', 'Long', 'Medium'],
                 datasets: [{
-                    data: dataValues,
-                    backgroundColor: ['#E5E7EB', '#1E3A8A', '#3B82F6'], // Gray, Dark Blue, Blue
+                    data: [allocation.Reserve, allocation.Long, allocation.Medium],
+                    backgroundColor: ['#E5E7EB', '#1E3A8A', '#3B82F6'],
                     hoverOffset: 4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
+                plugins: { legend: { position: 'bottom' } }
             }
         });
     }
@@ -327,29 +306,28 @@ XOM,Medium,Stock,42281,39410,7.28,Up`;
         const now = new Date();
         document.getElementById('currentDate').innerText = now.toLocaleDateString('ja-JP', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
-
-    // --- Storage ---
     
     saveToStorage() {
         localStorage.setItem('invest_assets', JSON.stringify(this.assets));
         localStorage.setItem('invest_logs', JSON.stringify(this.actionLogs));
+        localStorage.setItem('invest_ignored', JSON.stringify(this.ignoredSignals));
     }
 
     loadFromStorage() {
         const assets = localStorage.getItem('invest_assets');
         const logs = localStorage.getItem('invest_logs');
+        const ignored = localStorage.getItem('invest_ignored');
+        
         if (assets) this.assets = JSON.parse(assets);
         if (logs) this.actionLogs = JSON.parse(logs);
+        if (ignored) this.ignoredSignals = JSON.parse(ignored);
     }
 
     resetData() {
         if(!confirm("データを全て消去しますか？")) return;
         localStorage.clear();
-        this.assets = [];
-        this.actionLogs = [];
         location.reload();
     }
 }
 
-// アプリケーション起動
 const app = new InvestmentSystem();
