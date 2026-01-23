@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投資運用支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <header class="bg-blue-900 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Investment Operation Support System</h1>
+            <span id="currentDate" class="text-sm"></span>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <section class="lg:col-span-1 space-y-6">
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="text-lg font-bold mb-2 border-b pb-1">データインポート (CSV)</h2>
+                <textarea id="csvInput" class="w-full h-40 p-2 text-xs border rounded bg-gray-50 font-mono" placeholder="Ticker,Portfolio,Type,Value,CostBasis,PL_Pct,Trend_Day..."></textarea>
+                <div class="flex justify-between mt-2">
+                    <button onclick="app.resetData()" class="text-red-500 text-sm hover:underline">全データ消去</button>
+                    <button onclick="app.processInput()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">解析・更新</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="text-lg font-bold mb-2 border-b pb-1">ポートフォリオ配分</h2>
+                <div class="relative h-64">
+                    <canvas id="allocationChart"></canvas>
+                </div>
+                <div id="allocationAlerts" class="mt-4 space-y-2">
+                    </div>
+            </div>
+        </section>
+
+        <section class="lg:col-span-2 space-y-6">
+            
+            <div class="bg-white p-4 rounded shadow grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <p class="text-gray-500 text-xs">総資産評価額</p>
+                    <p id="totalValue" class="text-xl font-bold">-</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs">基準元本比 (DD)</p>
+                    <p id="drawdown" class="text-xl font-bold">-</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs">コンプライアンス率</p>
+                    <p id="complianceRate" class="text-xl font-bold">-</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs">アクション必要数</p>
+                    <p id="actionCount" class="text-xl font-bold text-red-600">-</p>
+                </div>
+            </div>
+
+            <div id="actionRequiredSection" class="bg-red-50 border-l-4 border-red-500 p-4 rounded shadow hidden">
+                <h2 class="text-red-700 font-bold mb-2">⚠️ アクションが必要です (売買シグナル)</h2>
+                <div id="actionList" class="space-y-3">
+                    </div>
+            </div>
+
+            <div class="bg-white p-4 rounded shadow overflow-x-auto">
+                <h2 class="text-lg font-bold mb-2 border-b pb-1">保有銘柄一覧</h2>
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-gray-600">
+                        <tr>
+                            <th class="p-2">Ticker</th>
+                            <th class="p-2">Pf / Type</th>
+                            <th class="p-2 text-right">評価額</th>
+                            <th class="p-2 text-right">損益(%)</th>
+                            <th class="p-2">Trend</th>
+                            <th class="p-2">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assetTableBody">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="text-lg font-bold mb-2 border-b pb-1">実行ログ</h2>
+                <ul id="logList" class="text-xs text-gray-600 h-32 overflow-y-auto space-y-1">
+                    </ul>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
