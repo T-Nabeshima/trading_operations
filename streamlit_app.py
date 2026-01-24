@@ -469,6 +469,13 @@ if stats["alerts"]:
 
 st.subheader("銘柄一覧")
 asset_df = pd.DataFrame(assets)
+asset_df.insert(
+    4,
+    "Days",
+    asset_df.get("TradeDate", pd.Series()).apply(
+        lambda d: calculate_business_days(d) if isinstance(d, str) else 0
+    ),
+)
 if "TradeDate" in asset_df.columns:
     asset_df["TradeDate"] = pd.to_datetime(asset_df["TradeDate"], errors="coerce").dt.date
 
@@ -476,6 +483,7 @@ edited_df = st.data_editor(
     asset_df,
     column_config={
         "TradeDate": st.column_config.DateColumn("TradeDate"),
+        "Days": st.column_config.NumberColumn("Days", disabled=True),
         "Portfolio": st.column_config.SelectboxColumn("Portfolio", options=["Reserve", "Long", "Medium"]),
         "Type": st.column_config.SelectboxColumn("Type", options=["Cash", "Stock", "MarginLong", "MarginShort"]),
         "Trend_Day": st.column_config.SelectboxColumn("Trend_Day", options=["Up", "Range", "Down"]),
@@ -491,6 +499,7 @@ edited_df = st.data_editor(
 
 updated_assets: List[Dict[str, Any]] = []
 for record in edited_df.to_dict("records"):
+    record.pop("Days", None)
     trade_date = record.get("TradeDate")
     if isinstance(trade_date, date):
         record["TradeDate"] = trade_date.isoformat()
