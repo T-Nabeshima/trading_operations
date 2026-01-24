@@ -4,6 +4,7 @@ import tempfile
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -452,15 +453,29 @@ col3.metric("コンプライアンス", f"{calculate_compliance(logs)}%")
 col4.metric("損益率(平均)", "-" if avg_pl is None else f"{avg_pl:.2f}%")
 
 st.subheader("アロケーション")
-alloc_df = pd.DataFrame(
-    [
-        {"Portfolio": "Reserve", "Value": stats["allocation"]["Reserve"]},
-        {"Portfolio": "Long", "Value": stats["allocation"]["Long"]},
-        {"Portfolio": "Medium", "Value": stats["allocation"]["Medium"]},
-    ]
-)
+alloc_values = [
+    stats["allocation"]["Reserve"],
+    stats["allocation"]["Long"],
+    stats["allocation"]["Medium"],
+]
+alloc_labels = ["Reserve", "Long", "Medium"]
+total_alloc = sum(alloc_values) if sum(alloc_values) else 1
+alloc_ratios = [v / total_alloc * 100 for v in alloc_values]
+alloc_display = [
+    f"{label}\n¥{value:,.0f}\n{ratio:.1f}%"
+    for label, value, ratio in zip(alloc_labels, alloc_values, alloc_ratios)
+]
 
-st.bar_chart(alloc_df, x="Portfolio", y="Value")
+fig, ax = plt.subplots(figsize=(4, 4))
+ax.pie(
+    alloc_values,
+    labels=alloc_display,
+    startangle=90,
+    counterclock=False,
+    wedgeprops={"width": 0.45, "edgecolor": "white"},
+)
+ax.set_aspect("equal")
+st.pyplot(fig, use_container_width=False)
 
 if stats["alerts"]:
     st.subheader("アラート")
