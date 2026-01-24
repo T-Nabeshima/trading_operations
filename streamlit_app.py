@@ -395,10 +395,20 @@ def build_authenticator(creds: Dict[str, str]) -> stauth.Authenticate:
 
 def run_login(authenticator: stauth.Authenticate):
     try:
-        return authenticator.login("ログイン", location="sidebar")
-    except TypeError:
+        import inspect
+
+        params = inspect.signature(authenticator.login).parameters
+    except Exception:
+        params = {}
+
+    if "location" in params and "form_name" in params:
+        return authenticator.login(form_name="ログイン", location="sidebar")
+    if "location" in params and "form_name" not in params:
+        return authenticator.login(location="sidebar")
+
+    try:
         return authenticator.login("ログイン", "sidebar")
-    except ValueError:
+    except Exception:
         return authenticator.login("sidebar")
 
 
