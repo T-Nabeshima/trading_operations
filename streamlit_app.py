@@ -344,7 +344,46 @@ def get_auth_credentials() -> Dict[str, str]:
         cookie_key = "change-me"
         st.sidebar.warning("cookie_keyが未設定です。Secretsで変更してください。")
 
-    return {"username": username, "password": password, "cookie_key": cookie_key}
+    return {
+        "username": str(username),
+        "password": str(password),
+        "cookie_key": str(cookie_key),
+    }
+
+
+def build_authenticator(creds: Dict[str, str]) -> stauth.Authenticate:
+    passwords = [creds["password"]]
+    try:
+        from streamlit_authenticator.utilities.hasher import Hasher
+
+        hashed_passwords = Hasher(passwords).generate()
+    except Exception:
+        hashed_passwords = stauth.Hasher(passwords).generate()
+
+    credentials = {
+        "usernames": {
+            creds["username"]: {
+                "name": "User",
+                "password": hashed_passwords[0],
+            }
+        }
+    }
+    try:
+        return stauth.Authenticate(
+            credentials,
+            "trading-operations-auth",
+            creds["cookie_key"],
+            cookie_expiry_days=7,
+        )
+    except TypeError:
+        return stauth.Authenticate(
+            ["User"],
+            [creds["username"]],
+            hashed_passwords,
+            "trading-operations-auth",
+            creds["cookie_key"],
+            cookie_expiry_days=7,
+        )
 
 
 def add_log(logs: List[Dict[str, Any]], ticker: str, action: str, log_type: str, reason: str = "") -> None:
@@ -398,14 +437,7 @@ def calculate_avg_pl(logs: List[Dict[str, Any]]) -> Optional[float]:
 
 st.set_page_config(page_title="投資運用支援", layout="wide")
 creds = get_auth_credentials()
-authenticator = stauth.Authenticate(
-    ["User"],
-    [creds["username"]],
-    stauth.Hasher([creds["password"]]).generate(),
-    "trading-operations-auth",
-    creds["cookie_key"],
-    cookie_expiry_days=7,
-)
+authenticator = build_authenticator(creds)
 name, auth_status, _ = authenticator.login("ログイン", "sidebar")
 if auth_status is False:
     st.sidebar.error("IDまたはパスワードが違います")
