@@ -406,7 +406,18 @@ def run_login(authenticator: stauth.Authenticate):
             return result[0], result[1], None
         if len(result) == 1:
             return result[0], None, None
-    return None, None, None
+    if isinstance(result, dict):
+        return (
+            result.get("name"),
+            result.get("authentication_status"),
+            result.get("username"),
+        )
+    # Fallback for versions that only set session_state.
+    return (
+        st.session_state.get("name"),
+        st.session_state.get("authentication_status"),
+        st.session_state.get("username"),
+    )
 
 
 def run_logout(authenticator: stauth.Authenticate) -> None:
