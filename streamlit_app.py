@@ -358,7 +358,14 @@ def build_authenticator(creds: Dict[str, str]) -> stauth.Authenticate:
 
         hashed_passwords = Hasher(passwords).generate()
     except Exception:
-        hashed_passwords = stauth.Hasher(passwords).generate()
+        try:
+            import bcrypt
+
+            hashed_passwords = [
+                bcrypt.hashpw(passwords[0].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            ]
+        except Exception as exc:
+            raise RuntimeError("Password hashing failed; check streamlit-authenticator/bcrypt.") from exc
 
     credentials = {
         "usernames": {
