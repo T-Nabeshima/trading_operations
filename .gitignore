@@ -1,0 +1,5 @@
+# Local data
+data/storage.json
+
+# Streamlit secrets (if created locally)
+.streamlit/secrets.toml
