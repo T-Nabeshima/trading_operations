@@ -393,6 +393,15 @@ def build_authenticator(creds: Dict[str, str]) -> stauth.Authenticate:
         )
 
 
+def run_login(authenticator: stauth.Authenticate):
+    try:
+        return authenticator.login("ログイン", location="sidebar")
+    except TypeError:
+        return authenticator.login("ログイン", "sidebar")
+    except ValueError:
+        return authenticator.login("sidebar")
+
+
 def add_log(logs: List[Dict[str, Any]], ticker: str, action: str, log_type: str, reason: str = "") -> None:
     logs.insert(
         0,
@@ -445,7 +454,7 @@ def calculate_avg_pl(logs: List[Dict[str, Any]]) -> Optional[float]:
 st.set_page_config(page_title="投資運用支援", layout="wide")
 creds = get_auth_credentials()
 authenticator = build_authenticator(creds)
-name, auth_status, _ = authenticator.login("ログイン", "sidebar")
+name, auth_status, _ = run_login(authenticator)
 if auth_status is False:
     st.sidebar.error("IDまたはパスワードが違います")
     st.stop()
