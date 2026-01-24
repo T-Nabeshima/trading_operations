@@ -18,6 +18,7 @@ streamlit run streamlit_app.py
 [auth]
 username = "your_id"
 password = "your_password"
+cookie_key = "your_cookie_secret"
 ```
 
 - ローカル環境変数:

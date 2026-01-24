@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
+import streamlit_authenticator as stauth
 
 CONFIG = {
     "INITIAL_CAPITAL": 900000,
@@ -319,42 +320,31 @@ def save_storage(assets: List[Dict[str, Any]], logs: List[Dict[str, Any]], ignor
 def get_auth_credentials() -> Dict[str, str]:
     username = None
     password = None
+    cookie_key = None
 
     if "auth" in st.secrets:
         auth = st.secrets["auth"]
         username = auth.get("username")
         password = auth.get("password")
+        cookie_key = auth.get("cookie_key")
 
     if not username:
         username = os.getenv("APP_USERNAME")
     if not password:
         password = os.getenv("APP_PASSWORD")
+    if not cookie_key:
+        cookie_key = os.getenv("APP_COOKIE_KEY")
 
     if not username or not password:
         username = "admin"
         password = "admin"
-        st.warning("簡易認証がデフォルト(admin/admin)です。Streamlit CloudのSecretsで変更してください。")
+        st.sidebar.warning("認証がデフォルト(admin/admin)です。Secretsで変更してください。")
 
-    return {"username": username, "password": password}
+    if not cookie_key:
+        cookie_key = "change-me"
+        st.sidebar.warning("cookie_keyが未設定です。Secretsで変更してください。")
 
-
-def require_auth() -> None:
-    creds = get_auth_credentials()
-    if st.session_state.get("auth_ok"):
-        return
-
-    with st.sidebar:
-        st.subheader("ログイン")
-        username = st.text_input("ID", key="auth_user")
-        password = st.text_input("パスワード", type="password", key="auth_pass")
-        if st.button("ログイン"):
-            if username == creds["username"] and password == creds["password"]:
-                st.session_state["auth_ok"] = True
-            else:
-                st.error("IDまたはパスワードが違います")
-
-    if not st.session_state.get("auth_ok"):
-        st.stop()
+    return {"username": username, "password": password, "cookie_key": cookie_key}
 
 
 def add_log(logs: List[Dict[str, Any]], ticker: str, action: str, log_type: str, reason: str = "") -> None:
@@ -407,9 +397,25 @@ def calculate_avg_pl(logs: List[Dict[str, Any]]) -> Optional[float]:
 
 
 st.set_page_config(page_title="投資運用支援", layout="wide")
-require_auth()
+creds = get_auth_credentials()
+authenticator = stauth.Authenticate(
+    ["User"],
+    [creds["username"]],
+    stauth.Hasher([creds["password"]]).generate(),
+    "trading-operations-auth",
+    creds["cookie_key"],
+    cookie_expiry_days=7,
+)
+name, auth_status, _ = authenticator.login("ログイン", "sidebar")
+if auth_status is False:
+    st.sidebar.error("IDまたはパスワードが違います")
+    st.stop()
+if auth_status is None:
+    st.sidebar.info("ログインしてください")
+    st.stop()
 
 with st.sidebar:
+    authenticator.logout("ログアウト", "sidebar")
     st.subheader("ルール設定")
     index_trend = st.selectbox("指数トレンド", ["Up", "Range", "Down"], index=1)
     st.divider()
