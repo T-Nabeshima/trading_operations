@@ -395,21 +395,25 @@ def build_authenticator(creds: Dict[str, str]) -> stauth.Authenticate:
 
 def run_login(authenticator: stauth.Authenticate):
     try:
-        import inspect
+        result = authenticator.login(location="sidebar")
+    except TypeError:
+        result = authenticator.login("ログイン", "sidebar")
 
-        params = inspect.signature(authenticator.login).parameters
-    except Exception:
-        params = {}
+    if isinstance(result, tuple):
+        if len(result) == 3:
+            return result
+        if len(result) == 2:
+            return result[0], result[1], None
+        if len(result) == 1:
+            return result[0], None, None
+    return None, None, None
 
-    if "location" in params and "form_name" in params:
-        return authenticator.login(form_name="ログイン", location="sidebar")
-    if "location" in params and "form_name" not in params:
-        return authenticator.login(location="sidebar")
 
+def run_logout(authenticator: stauth.Authenticate) -> None:
     try:
-        return authenticator.login("ログイン", "sidebar")
-    except Exception:
-        return authenticator.login("sidebar")
+        authenticator.logout(location="sidebar")
+    except TypeError:
+        authenticator.logout("ログアウト", "sidebar")
 
 
 def add_log(logs: List[Dict[str, Any]], ticker: str, action: str, log_type: str, reason: str = "") -> None:
@@ -473,7 +477,7 @@ if auth_status is None:
     st.stop()
 
 with st.sidebar:
-    authenticator.logout("ログアウト", "sidebar")
+    run_logout(authenticator)
     st.subheader("ルール設定")
     index_trend = st.selectbox("指数トレンド", ["Up", "Range", "Down"], index=1)
     st.divider()
