@@ -107,6 +107,25 @@ def normalize_assets(assets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return assets
 
 
+def merge_assets(existing_assets: List[Dict[str, Any]], new_assets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged = [dict(asset) for asset in existing_assets]
+    key_to_index = {}
+
+    for i, asset in enumerate(merged):
+        key = (asset.get("Ticker"), asset.get("Portfolio"), asset.get("Type"))
+        key_to_index[key] = i
+
+    for asset in new_assets:
+        key = (asset.get("Ticker"), asset.get("Portfolio"), asset.get("Type"))
+        if key in key_to_index:
+            merged[key_to_index[key]] = dict(asset)
+        else:
+            key_to_index[key] = len(merged)
+            merged.append(dict(asset))
+
+    return merged
+
+
 def calculate_business_days(start_date_str: str) -> int:
     if not start_date_str:
         return 0
@@ -514,9 +533,9 @@ with st.expander("CSV入力/更新", expanded=False):
         if uploaded is not None:
             text = uploaded.getvalue().decode("utf-8")
         new_assets = parse_csv(text)
-        assets = normalize_assets(new_assets)
+        assets = normalize_assets(merge_assets(assets, new_assets))
         save_storage(assets, logs, ignored)
-        st.success("データを更新しました")
+        st.success("データを追加更新しました")
 
 if not assets:
     st.info("データがありません。CSVを入力して更新してください。")
@@ -604,6 +623,17 @@ for record in edited_df.to_dict("records"):
 if updated_assets != assets:
     assets = updated_assets
     save_storage(assets, logs, ignored)
+
+st.caption("各銘柄の削除")
+for i, asset in enumerate(assets):
+    cols = st.columns([4, 2, 2, 1])
+    cols[0].write(f"{asset.get('Ticker', '')} / {asset.get('Name', '')}")
+    cols[1].write(str(asset.get("Portfolio", "")))
+    cols[2].write(str(asset.get("Type", "")))
+    if cols[3].button("削除", key=f"delete-asset-{i}-{asset.get('Ticker', '')}"):
+        assets.pop(i)
+        save_storage(assets, logs, ignored)
+        st.experimental_rerun()
 
 st.subheader("アクション必要")
 signal_count = 0
