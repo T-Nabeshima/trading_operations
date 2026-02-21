@@ -651,7 +651,7 @@ for asset in assets:
                 },
             )
             save_storage(assets, logs, ignored)
-            st.experimental_rerun()
+            st.rerun()
         if cols[2].button("無視", key=f"ignore-{asset.get('Ticker')}-{signal['label']}"):
             ignored.append({"ticker": asset.get("Ticker"), "signalType": signal["label"]})
             add_log(logs, asset.get("Ticker"), "IGNORE", "IGNORE", "")
@@ -665,7 +665,7 @@ for asset in assets:
                 },
             )
             save_storage(assets, logs, ignored)
-            st.experimental_rerun()
+            st.rerun()
 
 if signal_count == 0:
     st.success("アクション対象はありません")
