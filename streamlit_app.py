@@ -607,7 +607,7 @@ edited_df = st.data_editor(
         ),
     },
     use_container_width=True,
-    num_rows="fixed",
+    num_rows="dynamic",
 )
 
 updated_assets: List[Dict[str, Any]] = []
@@ -623,17 +623,6 @@ for record in edited_df.to_dict("records"):
 if updated_assets != assets:
     assets = updated_assets
     save_storage(assets, logs, ignored)
-
-st.caption("各銘柄の削除")
-for i, asset in enumerate(assets):
-    cols = st.columns([4, 2, 2, 1])
-    cols[0].write(f"{asset.get('Ticker', '')} / {asset.get('Name', '')}")
-    cols[1].write(str(asset.get("Portfolio", "")))
-    cols[2].write(str(asset.get("Type", "")))
-    if cols[3].button("削除", key=f"delete-asset-{i}-{asset.get('Ticker', '')}"):
-        assets.pop(i)
-        save_storage(assets, logs, ignored)
-        st.experimental_rerun()
 
 st.subheader("アクション必要")
 signal_count = 0
