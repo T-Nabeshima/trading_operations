@@ -36,8 +36,6 @@ def get_test_csv() -> str:
     return (
         "Ticker,Name,Portfolio,Type,TradeDate,Value,CostBasis,PL_Pct,Trend_Day,Country,Event,ShortReason\n"
         f"CASH_RESERVE,予備費,Reserve,Cash,{date_str},300000,300000,0.0,Range,JP,None,\n"
-        f"CASH_LONG,長期余力,Long,Cash,{date_str},58408,58408,0.0,Range,JP,None,\n"
-        f"CASH_MED,中期余力,Medium,Cash,{date_str},36211,36211,0.0,Range,JP,None,\n"
         f"1662,石油資源開発,Long,Stock,{past_str},188700,185115,1.93,Range,JP,None,\n"
         f"ALAB,アステラ・ラブス,Long,Stock,{date_str},52892,56443,-6.29,Down,US,None,\n"
         f"CRWD,クラウドストライク,Medium,Stock,{date_str},71326,74570,-4.35,Down,US,None,\n"
@@ -626,7 +624,7 @@ if updated_assets != assets:
 
 st.subheader("アクション必要")
 signal_count = 0
-for asset in assets:
+for i, asset in enumerate(assets):
     signal = generate_signal(asset, ignored, index_trend)
     if not signal:
         continue
@@ -639,7 +637,7 @@ for asset in assets:
             f"{signal['label']}  \n"
             f"理由: {signal['reason']}"
         )
-        if cols[1].button("実行記録", key=f"exec-{asset.get('Ticker')}-{signal['label']}"):
+        if cols[1].button("実行記録", key=f"exec-{i}-{asset.get('Ticker')}-{signal['label']}"):
             add_log(logs, asset.get("Ticker"), signal["label"], "EXECUTE")
             add_log_detail(
                 logs,
@@ -650,9 +648,11 @@ for asset in assets:
                     "rule_compliance": st.session_state.get("log_compliance", True),
                 },
             )
+            if signal.get("label") == "SELL ALL" and 0 <= i < len(assets):
+                assets.pop(i)
             save_storage(assets, logs, ignored)
             st.rerun()
-        if cols[2].button("無視", key=f"ignore-{asset.get('Ticker')}-{signal['label']}"):
+        if cols[2].button("無視", key=f"ignore-{i}-{asset.get('Ticker')}-{signal['label']}"):
             ignored.append({"ticker": asset.get("Ticker"), "signalType": signal["label"]})
             add_log(logs, asset.get("Ticker"), "IGNORE", "IGNORE", "")
             add_log_detail(
